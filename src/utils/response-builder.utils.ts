@@ -1,6 +1,6 @@
 import { ResponseType } from "../models/response.model";
 
-export function responseBuilder(data: any, meta: any, args: any){
+export function responseBuilder(data: any, meta?: any, args?: any){
     const response: ResponseType = {
         data: undefined
     };

@@ -2,7 +2,7 @@ import moment from "moment";
 import { Page } from "puppeteer";
 import { TransactionBankCard } from "../../models/transaction-bank-card.model";
 import { TransactionBank } from "../../models/transaction-bank.model";
-import { getData } from "../../utils/get-data.helper";
+import { getData } from "../../utils/get-data.utils";
 
 export class Transactions {
 

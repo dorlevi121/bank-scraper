@@ -11,7 +11,87 @@ datasource db {
 }
 
 model User {
-  id      Int      @id @default(autoincrement())
-  email   String   @unique
-  name    String?
+  id                 Int                  @id @default(autoincrement())
+  dateCreated        DateTime             @default(now())
+  dateUpdated        DateTime             @updatedAt
+  email              String               @unique
+  phone              String               @unique
+  firstName          String
+  lastName           String
+  hashedPassword     String
+  status             UserStatus           @default(PENDING)
+  bankId             String?
+  bankPassword       String?
+  bankCode           String?
+  transactionCard    TransactionCard[]
+  trasnactionAccount TransactionAccount[]
+}
+
+model TransactionCard {
+  id           Int      @id @default(autoincrement())
+  dateCreated  DateTime @default(now())
+  dateUpdated  DateTime @updatedAt
+  userId       Int
+  user         User     @relation(fields: [userId], references: [id])
+  date         DateTime
+  time         DateTime
+  description  String?
+  amount       String
+  currencyCode String?
+  merchantId   Int
+  merchant     Merchant @relation(fields: [merchantId], references: [id])
+}
+
+model TransactionAccount {
+  id          Int      @id @default(autoincrement())
+  dateCreated DateTime @default(now())
+  dateUpdated DateTime @updatedAt
+  userId      Int
+  user        User     @relation(fields: [userId], references: [id])
+  date        DateTime
+  description String?
+  amount      String
+  merchantId  Int
+  merchant    Merchant @relation(fields: [merchantId], references: [id])
+
+}
+
+model Merchant {
+  id                 Int                  @id @default(autoincrement())
+  dateCreated        DateTime             @default(now())
+  dateUpdated        DateTime             @updatedAt
+  name               String               @unique
+  phone              String?              @unique
+  address            String?
+  city               String?
+  sectorId           Int
+  sector             MerchantSector       @relation(fields: [sectorId], references: [id])
+  categoryId         Int
+  category           MerchantCategory     @relation(fields: [categoryId], references: [id])
+  TransactionCard    TransactionCard[]
+  TransactionAccount TransactionAccount[]
+}
+
+model MerchantSector {
+  id          Int        @id @default(autoincrement())
+  dateCreated DateTime   @default(now())
+  dateUpdated DateTime   @updatedAt
+  name        String     @unique
+  nameEnd     String     @unique
+  merchant    Merchant[]
+}
+
+model MerchantCategory {
+  id          Int        @id @default(autoincrement())
+  dateCreated DateTime   @default(now())
+  dateUpdated DateTime   @updatedAt
+  name        String     @unique
+  nameEnd     String     @unique
+  merchant    Merchant[]
+}
+
+enum UserStatus {
+  IN_ACTIVE
+  ACTIVE
+  PENDING
 }
