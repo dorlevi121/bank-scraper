@@ -2,7 +2,7 @@ import { Prisma, PrismaClient, User, UserStatus } from "@prisma/client";
 import { Request, Response } from "express";
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import { errorMessage } from "../models/enums/error-message.enum";
+import { errorMessage } from "../utils/error-message.enum";
 import { responseBuilder } from "../utils/response-builder.utils";
 import { Roles } from "../models/enums/roles.enum";
 
@@ -56,7 +56,7 @@ export async function registerUser(req: Request, res: Response) {
 }
 
 export async function loginUser(req: Request, res: Response) {
-    const { phone, password } = req.body;
+    const { phone, password } = req.body;    
 
     if (!(phone && password)) {
         const responsData = {
@@ -96,7 +96,7 @@ export async function loginUser(req: Request, res: Response) {
         token = jwt.sign(
             { id: user?.id, phone, userType: Roles.member },
             process?.env?.TOKEN_KEY || '',
-            { expiresIn: "7d" }
+            { expiresIn: "30d" }
         );
     }
     else {

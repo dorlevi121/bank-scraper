@@ -1,4 +1,4 @@
-export const Roles = {
-    member: 'member',
-    guest: 'guest'
+export enum Roles {
+    member,
+    guest
 }
