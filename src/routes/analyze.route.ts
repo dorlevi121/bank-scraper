@@ -1,6 +1,6 @@
 import express from 'express';
 const router = express.Router();
 
-router.post('/resetpassword',);
+router.get('',);
 
 export default router;
