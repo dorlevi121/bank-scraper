@@ -13,7 +13,8 @@
       "declarationMap": true,
       "resolveJsonModule": true,
       "esModuleInterop": true,
-      "typeRoots": ["./types"]
+      "typeRoots": ["./types"],
+      "strictPropertyInitialization": false
     },
     "include": [
       "./src/**/*"

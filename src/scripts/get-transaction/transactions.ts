@@ -1,11 +1,14 @@
 import moment from "moment";
 import { Page } from "puppeteer";
+import { Prisma, PrismaClient } from "@prisma/client";
 import { TransactionBankCard } from "../../models/transaction-bank-card.model";
 import { TransactionBank } from "../../models/transaction-bank.model";
 import { getData } from "../../utils/get-data.utils";
 
 export class Transactions {
 
+    private prismaClient = Prisma;
+    private prisma = new PrismaClient();
     private BASE_URL = 'https://start.telebank.co.il/';
     private accountNumber = "0126681262";
     private page: Page
@@ -43,7 +46,10 @@ export class Transactions {
             url = `${apiSiteUrl}lastTransactions/transactions/${this.accountNumber}/ByLastYear?IsTransactionDetails=True&IsFutureTransactionFlag=True&IsEventNames=True&IsCategoryDescCode=True`;
         }
 
-        const transaction: TransactionBank = await getData(this.page, url);
+        const transaction = await getData(this.page, url);
+        const transactionJson: TransactionBank = JSON.parse(transaction);
+
+        const transactionViewModel: any[] = [];
     }
 
     // from date example - 05/2021 - MM/yyyy

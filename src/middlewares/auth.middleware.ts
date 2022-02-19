@@ -27,9 +27,7 @@ export const verifyToken = (req: Request, res: Response, next: NextFunction) => 
         if (decoded)
             req.tokenData = decoded;
 
-    } catch (err) {
-            // console.log(err);
-        
+    } catch (err) {        
         return res.status(401).json(responseBuilder(responsData));
     }
     return next();

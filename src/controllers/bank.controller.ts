@@ -17,22 +17,23 @@ export async function addBankAccount(req: Request, res: Response) {
         return res.status(400).json(responseBuilder(responsData));
     }
 
-    await prisma.user.update({
-        where: {
-            id: Number(req.tokenData?.id)
+    await prisma.bank.upsert({
+        where: { userId: Number(req.tokenData?.id) },
+        update: {
+            password,
+            code
         },
-        data: {
-            bankId: id,
-            bankPassword: password,
-            bankCode: code
+        create: {
+            userId: Number(req.tokenData?.id),
+            identityCard: id,
+            password,
+            code
         }
     })
         .catch(err => {
-            const responsData = { error: true, message: errorMessage.operationNotPerformed, status: 400 }
+            const responsData = { rror: true, message: errorMessage.operationNotPerformed, status: 400 }
             return res.status(400).json(responseBuilder(responsData));
-
-        });
-
+        });;
 
     return res.status(201).json();
 }

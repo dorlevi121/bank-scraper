@@ -20,11 +20,21 @@ model User {
   lastName           String
   hashedPassword     String
   status             UserStatus           @default(PENDING)
-  bankId             String?
-  bankPassword       String?
-  bankCode           String?
   transactionCard    TransactionCard[]
   trasnactionAccount TransactionAccount[]
+  bank               Bank?
+}
+
+model Bank {
+  id            Int      @id @default(autoincrement())
+  dateCreated   DateTime @default(now())
+  dateUpdated   DateTime @updatedAt
+  userId        Int      
+  user          User     @relation(fields: [userId], references: [id])
+  identityCard  String   @unique
+  password      String
+  code          String
+  accountNumber String?
 }
 
 model TransactionCard {
