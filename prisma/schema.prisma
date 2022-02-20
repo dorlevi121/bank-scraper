@@ -29,7 +29,7 @@ model Bank {
   id            Int      @id @default(autoincrement())
   dateCreated   DateTime @default(now())
   dateUpdated   DateTime @updatedAt
-  userId        Int      
+  userId        Int      @unique
   user          User     @relation(fields: [userId], references: [id])
   identityCard  String   @unique
   password      String
@@ -43,13 +43,12 @@ model TransactionCard {
   dateUpdated  DateTime @updatedAt
   userId       Int
   user         User     @relation(fields: [userId], references: [id])
-  date         DateTime
-  time         DateTime
+  date         String
   description  String?
   amount       String
   currencyCode String?
-  merchantId   Int
-  merchant     Merchant @relation(fields: [merchantId], references: [id])
+  merchantName String
+  merchant     Merchant @relation(fields: [merchantName], references: [name])
 }
 
 model TransactionAccount {
@@ -74,10 +73,10 @@ model Merchant {
   phone              String?              @unique
   address            String?
   city               String?
-  sectorId           Int
-  sector             MerchantSector       @relation(fields: [sectorId], references: [id])
-  categoryId         Int
-  category           MerchantCategory     @relation(fields: [categoryId], references: [id])
+  sectorId           Int?
+  sector             MerchantSector?      @relation(fields: [sectorId], references: [id])
+  categoryId         Int?
+  category           MerchantCategory?    @relation(fields: [categoryId], references: [id])
   TransactionCard    TransactionCard[]
   TransactionAccount TransactionAccount[]
 }
@@ -87,7 +86,7 @@ model MerchantSector {
   dateCreated DateTime   @default(now())
   dateUpdated DateTime   @updatedAt
   name        String     @unique
-  nameEnd     String     @unique
+  englishName String     @unique
   merchant    Merchant[]
 }
 
@@ -96,7 +95,7 @@ model MerchantCategory {
   dateCreated DateTime   @default(now())
   dateUpdated DateTime   @updatedAt
   name        String     @unique
-  nameEnd     String     @unique
+  englishName String     @unique
   merchant    Merchant[]
 }
 

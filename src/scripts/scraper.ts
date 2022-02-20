@@ -1,14 +1,13 @@
-import { Prisma, PrismaClient, User } from "@prisma/client";
+import { PrismaClient, User } from "@prisma/client";
 import { Transactions } from "./get-transaction/transactions";
 import { BrowserScraper } from "./init/browser-scraper";
 import { ConnectAccount } from "./init/connect-account";
 
 export class Scraper {
 
-  private prismaClient = Prisma;
   private prisma = new PrismaClient();
-  private browser = new BrowserScraper();
-  private account = new ConnectAccount();
+  private browser: BrowserScraper;
+  private account: ConnectAccount;
   private userId: number;
   private user: User;
 
@@ -16,19 +15,22 @@ export class Scraper {
     this.userId = userId;
   }
 
-  public async start() {
+  public async start(): Promise<boolean> {
     const userExist = await this.getUser();
 
     if (!userExist)
       return false;
 
+    this.browser = new BrowserScraper();
     await this.browser.init();
-    const connect = await this.account.connectToAccount(this.browser.page, this.user);
+
+    this.account = new ConnectAccount(this.user);
+    const connect = await this.account.connectToAccount(this.browser.page);
 
     if (connect) {
-      // const tb = new Transactions(this.browser.page);
+      const tb = new Transactions(this.browser.page, this.user);
       // await tb.getTransactionsBank();
-      // await tb.getTransactionsBankCard();
+      await tb.getTransactionsBankCard();
     }
     else {
       return false;
@@ -58,6 +60,4 @@ export class Scraper {
     }
     return false;
   }
-
-
 } 

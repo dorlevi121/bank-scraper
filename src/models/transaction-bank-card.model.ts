@@ -1,4 +1,4 @@
-export interface TransactionBankCard {
+export interface TransactionBankCardJson {
     CardCurrentDebitTransactions: CardCurrentDebitTransactions
   }
   

@@ -1,5 +1,5 @@
 import { Page } from "puppeteer";
-import { Prisma, PrismaClient, User } from "@prisma/client";
+import { Prisma, PrismaClient } from "@prisma/client";
 
 export class ConnectAccount {
 
@@ -8,32 +8,34 @@ export class ConnectAccount {
     private BASE_URL = 'https://start.telebank.co.il/';
     private user: any;
 
-    constructor() { }
-
-    async connectToAccount(page: Page, user: any) {
+    constructor(user: any) {
         this.user = user;
+    }
 
-        if (user?.bank) {
+    async connectToAccount(page: Page): Promise<boolean> {
+
+        if (this.user?.bank) {
             // Id
             await page.waitForSelector("#tzId");
-            await page.type("#tzId", user?.bank?.identityCard || '', { delay: 100 });
+            await page.type("#tzId", this.user?.bank?.identityCard || '', { delay: 100 });
             // Password
             await page.waitForSelector("#tzPassword");
-            await page.type("#tzPassword", user.bank?.password, { delay: 100 });
+            await page.type("#tzPassword", this.user.bank?.password, { delay: 100 });
             // Code
             await page.waitForSelector("#aidnum");
-            await page.type("#aidnum", user.bank?.code || '', { delay: 500 });
+            await page.type("#aidnum", this.user.bank?.code || '', { delay: 500 });
             // Connect button
             await page.waitForSelector(".sendBtn");
             await page.click('.sendBtn');
 
-            const result = await this.checkIfConnect(page);
+            const isConnect = await this.checkIfConnect(page);
 
-            if (result?.length)
+            if (isConnect?.length)
                 return false;
 
-            if (!user.bank.accountNumber)
-                await this.setAccountNumber(page);
+            if (!this.user.bank.accountNumber && !await this.setAccountNumber(page)) {
+                return false;
+            }
         }
         else {
             return false;
@@ -42,7 +44,7 @@ export class ConnectAccount {
         return true;
     }
 
-    private async checkIfConnect(page: Page) {
+    private async checkIfConnect(page: Page): Promise<string> {
         try {
             await page.waitForNavigation({ timeout: 10000 });
         } catch (error) {
@@ -69,19 +71,21 @@ export class ConnectAccount {
                 }
             }
         }
-
+        return '';
     }
 
-    private async setAccountNumber(page: Page) {
+    private async setAccountNumber(page: Page): Promise<boolean> {
         const accountNumber = await page.$eval(".topComboLabel .comboHeaderAccountNumber", el => el.textContent);
-        
+        if (!accountNumber)
+            return false;
+
         await this.prisma.bank.update({
             where: { userId: this.user.id },
             data: {
                 accountNumber
             }
-        })
-
+        });
+        return true;
     }
 
 }

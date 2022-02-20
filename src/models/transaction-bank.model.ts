@@ -1,4 +1,4 @@
-export interface TransactionBank {
+export interface TransactionBankJson {
     CurrentAccountLastTransactions: CurrentAccountLastTransactions
   }
   

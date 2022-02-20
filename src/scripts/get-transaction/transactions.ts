@@ -1,20 +1,22 @@
 import moment from "moment";
 import { Page } from "puppeteer";
-import { Prisma, PrismaClient } from "@prisma/client";
-import { TransactionBankCard } from "../../models/transaction-bank-card.model";
-import { TransactionBank } from "../../models/transaction-bank.model";
+import { PrismaClient, TransactionCard } from "@prisma/client";
+import { TransactionBankCardJson } from "../../models/transaction-bank-card.model";
+import { TransactionBankJson } from "../../models/transaction-bank.model";
 import { getData } from "../../utils/get-data.utils";
 
 export class Transactions {
 
-    private prismaClient = Prisma;
     private prisma = new PrismaClient();
     private BASE_URL = 'https://start.telebank.co.il/';
-    private accountNumber = "0126681262";
+    private accountNumber = "";
     private page: Page
+    private user: any;
 
-    constructor(page: Page) {
+    constructor(page: Page, user: any) {
         this.page = page;
+        this.user = user;
+        this.accountNumber = this.user.bank.accountNumber;
     }
 
     // from date example - 10/05/2021 - DD/MM/yyyy
@@ -41,13 +43,12 @@ export class Transactions {
                 "/ByDate?FromDate=" + startDateStr + "&ToDate=" + endDateStr
                 + "&IsTransactionDetails=True&IsFutureTransactionFlag=True&IsEventNames=True&IsCategoryDescCode=True";
         }
-        else {
-            // Take transaction of the last 1 year
+        else { // Take transaction of the last 1 year
             url = `${apiSiteUrl}lastTransactions/transactions/${this.accountNumber}/ByLastYear?IsTransactionDetails=True&IsFutureTransactionFlag=True&IsEventNames=True&IsCategoryDescCode=True`;
         }
 
         const transaction = await getData(this.page, url);
-        const transactionJson: TransactionBank = JSON.parse(transaction);
+        const transactionJson: TransactionBankJson = JSON.parse(transaction);
 
         const transactionViewModel: any[] = [];
     }
@@ -66,7 +67,38 @@ export class Transactions {
             transactionsBankCardsUrl = this.BASE_URL + "Titan/gatewayAPI/creditCards/cardCurrentDebitTransactions/" +
                 this.accountNumber + "/A";
         }
-        const transactionsBankCards: TransactionBankCard = await getData(this.page, transactionsBankCardsUrl);
+        const transactionsBankCards: TransactionBankCardJson = await getData(this.page, transactionsBankCardsUrl);
 
+        await this.prisma.merchant.createMany({
+            data: transactionsBankCards.CardCurrentDebitTransactions
+                .CardDebitsTransactionsBlock.CardDebitsTransactionEntry.map(transaction => {
+                    return {
+                        name: transaction.MerchantName,
+                        address: transaction?.MerchantFullAddress,
+                        city: transaction.MerchantCity,
+                        phone: transaction.MerchantPhoneNumber
+                    }
+                }),
+            skipDuplicates: true
+        });
+
+        await this.prisma.transactionCard.createMany({
+            data: transactionsBankCards.CardCurrentDebitTransactions
+                .CardDebitsTransactionsBlock.CardDebitsTransactionEntry.map(transaction => {
+                    return {
+                        userId: this.user.id,
+                        amount: transaction.PurchaseAmount.toString(),
+                        currencyCode: transaction.PurchaseCurrencyCode,
+                        date: transaction.PurchaseDate,
+                        description: transaction.PurchaseTypeDescription,
+                        merchantName: transaction.MerchantName
+                    }
+                }),
+            skipDuplicates: true
+        })
+        .catch(err => {
+            console.log(err);
+            
+        });
     }
 }

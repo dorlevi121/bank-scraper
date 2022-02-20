@@ -1,4 +1,4 @@
-import { Prisma, PrismaClient, User, UserStatus } from "@prisma/client";
+import { PrismaClient, UserStatus } from "@prisma/client";
 import { Request, Response } from "express";
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
@@ -6,7 +6,6 @@ import { errorMessage } from "../utils/error-message.enum";
 import { responseBuilder } from "../utils/response-builder.utils";
 import { Roles } from "../models/enums/roles.enum";
 
-const prismaClient = Prisma;
 const prisma = new PrismaClient();
 
 export async function registerUser(req: Request, res: Response) {
@@ -56,7 +55,7 @@ export async function registerUser(req: Request, res: Response) {
 }
 
 export async function loginUser(req: Request, res: Response) {
-    const { phone, password } = req.body;    
+    const { phone, password } = req.body;
 
     if (!(phone && password)) {
         const responsData = {
@@ -108,7 +107,7 @@ export async function loginUser(req: Request, res: Response) {
         return res.status(401).json(responseBuilder(responsData));
     }
 
-    const {hashedPassword, ...responsData}: any = user;
+    const { hashedPassword, ...responsData }: any = user;
 
     return res.status(200).json(responseBuilder(responsData, {}, { token }));
 }
