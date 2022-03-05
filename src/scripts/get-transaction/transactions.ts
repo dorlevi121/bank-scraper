@@ -1,7 +1,7 @@
 import moment from "moment";
 import { Page } from "puppeteer";
 import { PrismaClient, TransactionCard } from "@prisma/client";
-import { TransactionBankCardJson } from "../../models/transaction-bank-card.model";
+import { CardDebitsTransactionEntry, TransactionBankCardJson } from "../../models/transaction-bank-card.model";
 import { TransactionBankJson } from "../../models/transaction-bank.model";
 import { getData } from "../../utils/get-data.utils";
 
@@ -53,52 +53,130 @@ export class Transactions {
         const transactionViewModel: any[] = [];
     }
 
-    // from date example - 05/2021 - MM/yyyy
-    public async getTransactionsBankCard(fromDate?: string) {
+    // from date example - 20210510 - YYYYMMDD
+    public async getTransactionsBankCard() {
+        let transactionsBankCards: CardDebitsTransactionEntry[] = [];
+        let fromDate: string = '';
+        let monthDifference: number = 0;
+        const urlsRequest = [];
+
         await this.page.waitForSelector("#balance-block-first-line-0");
 
-        let transactionsBankCardsUrl: string;
-        if (fromDate) {
-            const startDateStr = moment(fromDate, "MM-YYYY").format("MMYYYY");
-            transactionsBankCardsUrl = this.BASE_URL + "Titan/gatewayAPI/creditCards/cardPastDebitTransactions/" +
-                this.accountNumber + startDateStr;
-        }
-        else {
-            transactionsBankCardsUrl = this.BASE_URL + "Titan/gatewayAPI/creditCards/cardCurrentDebitTransactions/" +
-                this.accountNumber + "/A";
-        }
-        const transactionsBankCards: TransactionBankCardJson = await getData(this.page, transactionsBankCardsUrl);
+        const lastedTransaction = await this.getLastedTransaction();
 
-        await this.prisma.merchant.createMany({
-            data: transactionsBankCards.CardCurrentDebitTransactions
-                .CardDebitsTransactionsBlock.CardDebitsTransactionEntry.map(transaction => {
-                    return {
-                        name: transaction.MerchantName,
-                        address: transaction?.MerchantFullAddress,
-                        city: transaction.MerchantCity,
-                        phone: transaction.MerchantPhoneNumber
-                    }
-                }),
-            skipDuplicates: true
-        });
+        if (lastedTransaction) {
+            const fromDay = Number(moment(lastedTransaction.date, "YYYYMMDD").get('D'));
+            fromDate = moment(lastedTransaction.date, "YYYYMMDD").format("MMYYYY");
+            // Month difference between todat to last transaction month
+            monthDifference = moment(moment().format("MMYYYY"), "MMYYYY").diff(moment(fromDate, "MMYYYY").
+                add(fromDay > 6 ? 1 : 0, 'month'), 'months', true);
+            monthDifference = monthDifference > 12 ? 12 : monthDifference;
+        }
 
-        await this.prisma.transactionCard.createMany({
-            data: transactionsBankCards.CardCurrentDebitTransactions
-                .CardDebitsTransactionsBlock.CardDebitsTransactionEntry.map(transaction => {
-                    return {
-                        userId: this.user.id,
-                        amount: transaction.PurchaseAmount.toString(),
-                        currencyCode: transaction.PurchaseCurrencyCode,
-                        date: transaction.PurchaseDate,
-                        description: transaction.PurchaseTypeDescription,
-                        merchantName: transaction.MerchantName
-                    }
-                }),
+        if (fromDate.length && monthDifference > 0) {
+            for (let i = monthDifference; i > 0; i--) {
+                const startDateStr = moment().subtract(i, 'months').format('MMYYYY');
+                const url = this.BASE_URL + "Titan/gatewayAPI/creditCards/cardPastDebitTransactions/" +
+                    this.accountNumber + '/' + startDateStr + "/A";
+                urlsRequest.push(url);
+            }
+        }
+
+        const url = this.BASE_URL + "Titan/gatewayAPI/creditCards/cardCurrentDebitTransactions/" +
+            this.accountNumber + "/A";
+        urlsRequest.push(url);
+
+        let i = 0;
+        for (const url of urlsRequest) {
+            const data: TransactionBankCardJson = await getData(this.page, url);
+            if (data.CardCurrentDebitTransactions) {
+                transactionsBankCards = transactionsBankCards
+                    .concat(data.CardCurrentDebitTransactions.CardDebitsTransactionsBlock.CardDebitsTransactionEntry)
+            }
+            else if (data.CardPastDebitTransactions) {
+                transactionsBankCards = transactionsBankCards
+                    .concat(data.CardPastDebitTransactions.CardDebitsTransactionsBlock.CardDebitsTransactionEntry)
+            }
+            if (i++ === 0 && lastedTransaction) {
+                const lastTransactions: number = transactionsBankCards.findIndex(t =>
+                    t.PurchaseDate === lastedTransaction?.date && t.PurchaseAmount === Number(lastedTransaction.amount)
+                    && t.MerchantName === lastedTransaction.merchantName);
+                if (lastTransactions)
+                    transactionsBankCards.splice(lastTransactions);
+            }
+        }
+
+        // console.log(transactionsBankCards?.CardCurrentDebitTransactions.CardDebitsTransactionsBlock.CardDebitsTransactionEntry);
+        this.createTransaction(transactionsBankCards.reverse());
+    }
+
+
+    private async createTransaction(transaction: CardDebitsTransactionEntry[]): Promise<boolean> {
+        let success = true;
+
+        await this.prisma.merchantSector.createMany({
+            data: transaction.map(t => {
+                return {
+                    name: t.MerchantSector || "",
+                    englishName: '',
+                }
+            }),
             skipDuplicates: true
         })
-        .catch(err => {
-            console.log(err);
-            
-        });
+            .catch(err => {
+                success = false;
+            });
+
+        await this.prisma.merchant.createMany({
+            data: transaction.map(t => {
+                return {
+                    name: t.MerchantName,
+                    address: t?.MerchantFullAddress,
+                    city: t.MerchantCity,
+                    phone: t.MerchantPhoneNumber,
+                    sectorName: t.MerchantSector
+                }
+            }),
+            skipDuplicates: true
+        })
+            .catch(err => {
+                success = false;
+            });
+
+        await this.prisma.transactionCard.createMany({
+            data: transaction.map(t => {
+                return {
+                    userId: this.user.id,
+                    amount: t.PurchaseAmount?.toString() || "0",
+                    currencyCode: t?.PurchaseLocationCode,
+                    date: t.PurchaseDate,
+                    description: t.PurchaseTypeDescription,
+                    merchantName: t.MerchantName
+                }
+            }),
+            skipDuplicates: true
+        })
+            .catch(err => {
+                success = false;
+            });
+
+        return success;
+    }
+
+    private async getLastedTransaction(): Promise<{ date: string, merchantName: string, amount: string } | null> {
+        const lastedTransaction = await this.prisma.transactionCard.findMany({
+            where: { userId: this.user.id },
+            select: { date: true, merchantName: true, amount: true },
+            orderBy: { date: 'asc' },
+            take: 1
+        })
+            .catch(err => {
+                console.log(err);
+            });
+
+        if (lastedTransaction?.length)
+            return lastedTransaction[0];
+
+        return null;
     }
 }

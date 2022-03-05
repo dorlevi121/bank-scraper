@@ -73,8 +73,8 @@ model Merchant {
   phone              String?              @unique
   address            String?
   city               String?
-  sectorId           Int?
-  sector             MerchantSector?      @relation(fields: [sectorId], references: [id])
+  sectorName         String?
+  sector             MerchantSector?      @relation(fields: [sectorName], references: [name])
   categoryId         Int?
   category           MerchantCategory?    @relation(fields: [categoryId], references: [id])
   TransactionCard    TransactionCard[]

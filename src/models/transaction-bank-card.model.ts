@@ -1,4 +1,5 @@
 export interface TransactionBankCardJson {
+    CardPastDebitTransactions: CardCurrentDebitTransactions
     CardCurrentDebitTransactions: CardCurrentDebitTransactions
   }
   
@@ -23,35 +24,16 @@ export interface TransactionBankCardJson {
   export interface CardDebitsTransactionEntry {
     PurchaseDate: string
     MerchantName: string
-    PurchaseTypeCode: number
+    MerchantSector: string
     PurchaseTypeDescription: string
     PurchaseLocationCode: string
     PurchaseLocationDescription: string
-    InstallmentsNumber: string
-    InstallmentNumber: string
-    TotalNumberOfInstallments: string
-    PurchaseAmount: number
+    PurchaseComments: string
+    PurchaseAmount?: number
     CalPurchaseCurrencySymbol: string
-    PurchaseCurrencyCode: string
     DebitDate: string
     DebitAmount: number
-    CalDebitCurrencySymbol: string
-    DebitCurrencyCode: string
-    TotalNumberOfPayments: number
-    PurchaseLinkageCode: string
-    PurchaseBaseExchangeRate: number
-    PurchaseExchangeRate: number
-    IssuerCode: string
-    StandingOrderFlag: string
-    CardPresentedFlag: string
-    CurrencyConversionDate: string
-    CurrencyConversionRate: number
-    InternationalClearingConversionAmount: number
-    InternationalClearingCurrency: string
-    InternationalClearingCurrencyConversionRate: number
-    ConversionRateCommission: number
-    ConversionRateCommissionPercent: string
-    ConversionRateCommissionAmount: number
+    DebitCurrencySymbol: string
     CurrencyExchangeRateAmountGap: number
     CurrencyExchangeRate: number
     ForeignCashWithdrawalCommissionAmount: number
@@ -64,27 +46,27 @@ export interface TransactionBankCardJson {
     MerchantFaxNumber: string
     MerchantSectorCodeDescription: string
     PurchaseTime: string
+    ClubDiscountAmount: number
+    ClubDiscountPercent: number
+    ClubName: string
     TaxAmount: number
+    PurchaseMethodType: string
     MerchantAddressXcoordinate: string
     MerchantAddressYcoordinate: string
-    TempPurchaseFlag: string
     DigitalWalletType: number
     DescriptionOfDigitalWalletType: string
     Last4DigitsOfToken: string
     CardNumber: string
-    IssuingCompanyName: string
     CardFamilyDescription: string
     CardName: string
     OrderNumerator: number
-    ImmediateDebit: string
-    DiscountClubAmount: number
-    DiscountClubPercent: number
-    DiscountClubName: string
+    PurchaseDescription: string
+    IssuingCompanyName: string
+    IssuerCode: string
     GoogleAPIKey: string
-    PurchaseType: string
+    CardValidityDate: string
     BankIssueFlag: string
     IsIssuedByCal: string
-    CardValidityDate: string
   }
   
   export interface DiscountKeyTotalsBlock {

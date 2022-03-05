@@ -1,8 +1,6 @@
 import { Page } from "puppeteer";
 
 export async function getData(page: Page, url: string) {
-    console.log(url);
-
     const data = await page.evaluate((url) => {
 
         return new Promise<any>((resolve, reject) => {
