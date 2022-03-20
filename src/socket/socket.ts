@@ -23,12 +23,17 @@ export async function startSocket(server: any) {
     }
   })
     .on("connection", function (socket: Socket) {
-      console.log("a user connected", socket.id);
+      // console.log("a user connected", socket.id);
       // console.log("user Data: ", socket.tokenData);
+      let scraper: Scraper;
       if (socket.tokenData) {
-        const scraper = new Scraper(Number(socket.tokenData.id));
+        scraper = new Scraper(Number(socket.tokenData.id));
         scraper.start();
       }
+
+      socket.on('test-get-transaction', () => {
+        scraper.test();
+      })
 
 
       socket.on('disconnect', () => {

@@ -42,6 +42,14 @@ export class Scraper {
     // const cardList: CardList = await getData(bs.page, cardListUrl);
   }
 
+  public async test() {
+    const tb = new Transactions(this.browser.page, this.user);
+    // await tb.getTransactionsBank();
+    await tb.getTransactionsBankCard();
+  }
+  
+
+
   private async getUser(): Promise<boolean> {
 
     const user: any = await this.prisma.user.findUnique({

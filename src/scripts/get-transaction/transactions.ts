@@ -4,6 +4,9 @@ import { PrismaClient, TransactionCard } from "@prisma/client";
 import { CardDebitsTransactionEntry, TransactionBankCardJson } from "../../models/transaction-bank-card.model";
 import { TransactionBankJson } from "../../models/transaction-bank.model";
 import { getData } from "../../utils/get-data.utils";
+import { MerchantSectorPost } from "../../view-models/merchant-sector.vm";
+import { MerchantPost } from "../../view-models/merchant.vm";
+import { TransactionPost } from "../../view-models/transaction.vm";
 
 export class Transactions {
 
@@ -105,60 +108,81 @@ export class Transactions {
                     transactionsBankCards.splice(lastTransactions);
             }
         }
-
-        // console.log(transactionsBankCards?.CardCurrentDebitTransactions.CardDebitsTransactionsBlock.CardDebitsTransactionEntry);
         this.createTransaction(transactionsBankCards.reverse());
     }
 
 
     private async createTransaction(transaction: CardDebitsTransactionEntry[]): Promise<boolean> {
         let success = true;
+        const sectors: MerchantSectorPost[] = [], merchants: MerchantPost[] = [];
+        await transaction.forEach(t => {
+            if (t?.MerchantSector && t?.MerchantSector?.length) {
+                sectors.push(
+                    {
+                        name: t?.MerchantSector,
+                        englishName: '',
+                    }
+                )
+            }
+        });
+        if (sectors.length) {
+            await this.prisma.merchantSector.createMany({
+                data: sectors,
+                skipDuplicates: true
+            })
+                .catch(err => {
+                    success = false;
+                });
+        }
 
-        await this.prisma.merchantSector.createMany({
-            data: transaction.map(t => {
-                return {
-                    name: t.MerchantSector || "",
-                    englishName: '',
-                }
-            }),
-            skipDuplicates: true
-        })
-            .catch(err => {
-                success = false;
-            });
+        // Merchant
+        transaction.map(t => {
+            if (t?.MerchantName && t?.MerchantName?.length) {
+                merchants.push(
+                    {
+                        name: t?.MerchantName,
+                        address: t?.MerchantFullAddress || "",
+                        city: t?.MerchantCity || "",
+                        phone: t?.MerchantPhoneNumber || "",
+                        categoryId: 1,
+                        sectorName: t?.MerchantSector?.length ? t.MerchantSector : "אין סקטור"
+                    }
+                )
+            }
+        });
+        
+        if (merchants?.length) {
+            await this.prisma.merchant.createMany({
+                data: merchants,
+                skipDuplicates: true
+            })
+                .catch(err => {
+                    success = false;
+                });
+        }
 
-        await this.prisma.merchant.createMany({
-            data: transaction.map(t => {
-                return {
-                    name: t.MerchantName,
-                    address: t?.MerchantFullAddress,
-                    city: t.MerchantCity,
-                    phone: t.MerchantPhoneNumber,
-                    sectorName: t.MerchantSector
-                }
-            }),
-            skipDuplicates: true
-        })
-            .catch(err => {
-                success = false;
-            });
+        // const transactionModel: TransactionPost[] = await transaction.map(t => {
+        //     return {
+        //         userId: Number(this.user.id),
+        //         amount: t?.PurchaseAmount?.toString() || "0",
+        //         date: t?.PurchaseDate || "",
+        //         description: t?.PurchaseTypeDescription || "",
+        //         merchantName: t?.MerchantName.length ? t.MerchantName : "אין סוחר"
+        //     }
+        // });
+        // console.log(transactionModel);
 
-        await this.prisma.transactionCard.createMany({
-            data: transaction.map(t => {
-                return {
-                    userId: this.user.id,
-                    amount: t.PurchaseAmount?.toString() || "0",
-                    currencyCode: t?.PurchaseLocationCode,
-                    date: t.PurchaseDate,
-                    description: t.PurchaseTypeDescription,
-                    merchantName: t.MerchantName
-                }
-            }),
-            skipDuplicates: true
-        })
-            .catch(err => {
-                success = false;
-            });
+        // if (transactionModel.length) {
+        //     const a = await this.prisma.transactionCard.createMany({
+        //         data: transactionModel
+        //     })
+        //         .catch(err => {
+        //             console.log(err);
+        //             success = false;
+        //         });
+        //     console.log(a);
+        // }
+
 
         return success;
     }

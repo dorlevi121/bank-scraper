@@ -46,7 +46,6 @@ model TransactionCard {
   date         String
   description  String?
   amount       String
-  currencyCode String?
   merchantName String
   merchant     Merchant @relation(fields: [merchantName], references: [name])
 }
@@ -60,8 +59,8 @@ model TransactionAccount {
   date        DateTime
   description String?
   amount      String
-  merchantId  Int
-  merchant    Merchant @relation(fields: [merchantId], references: [id])
+  merchantName String
+  merchant     Merchant @relation(fields: [merchantName], references: [name])
 
 }
 
