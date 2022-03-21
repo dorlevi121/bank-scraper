@@ -1,6 +1,6 @@
 import moment from "moment";
 import { Page } from "puppeteer";
-import { PrismaClient, TransactionCard } from "@prisma/client";
+import { PrismaClient } from "@prisma/client";
 import { CardDebitsTransactionEntry, TransactionBankCardJson } from "../../models/transaction-bank-card.model";
 import { TransactionBankJson } from "../../models/transaction-bank.model";
 import { getData } from "../../utils/get-data.utils";
@@ -61,7 +61,7 @@ export class Transactions {
         let transactionsBankCards: CardDebitsTransactionEntry[] = [];
         let fromDate: string = '';
         let monthDifference: number = 0;
-        const urlsRequest = [];
+        const urlsRequest: { url: string, date: string }[] = [];
 
         await this.page.waitForSelector("#balance-block-first-line-0");
 
@@ -81,32 +81,36 @@ export class Transactions {
                 const startDateStr = moment().subtract(i, 'months').format('MMYYYY');
                 const url = this.BASE_URL + "Titan/gatewayAPI/creditCards/cardPastDebitTransactions/" +
                     this.accountNumber + '/' + startDateStr + "/A";
-                urlsRequest.push(url);
+                urlsRequest.push({ url, date: moment(startDateStr).format('MMYY') });
             }
         }
 
         const url = this.BASE_URL + "Titan/gatewayAPI/creditCards/cardCurrentDebitTransactions/" +
             this.accountNumber + "/A";
-        urlsRequest.push(url);
+        urlsRequest.push({ url, date: moment().format('MMYY') });
 
         let i = 0;
-        for (const url of urlsRequest) {
-            const data: TransactionBankCardJson = await getData(this.page, url);
+        for (const url of urlsRequest) { 
+            const data: TransactionBankCardJson = await getData(this.page, url.url);
             if (data.CardCurrentDebitTransactions) {
-                transactionsBankCards = transactionsBankCards
-                    .concat(data.CardCurrentDebitTransactions.CardDebitsTransactionsBlock.CardDebitsTransactionEntry)
+                const monthTransaction = data.CardCurrentDebitTransactions.CardDebitsTransactionsBlock.CardDebitsTransactionEntry;
+                monthTransaction[monthTransaction.length - 1].FirstTransactionOfMonth = url.date;
+                transactionsBankCards = transactionsBankCards.concat(monthTransaction)
             }
             else if (data.CardPastDebitTransactions) {
-                transactionsBankCards = transactionsBankCards
-                    .concat(data.CardPastDebitTransactions.CardDebitsTransactionsBlock.CardDebitsTransactionEntry)
+                const monthTransaction = data.CardPastDebitTransactions.CardDebitsTransactionsBlock.CardDebitsTransactionEntry;
+                monthTransaction[monthTransaction.length - 1].FirstTransactionOfMonth = url.date;
+                transactionsBankCards = transactionsBankCards.concat(monthTransaction)
+
             }
-            if (i++ === 0 && lastedTransaction) {
+            if (i === urlsRequest.length - 1 && lastedTransaction) {
                 const lastTransactions: number = transactionsBankCards.findIndex(t =>
                     t.PurchaseDate === lastedTransaction?.date && t.PurchaseAmount === Number(lastedTransaction.amount)
                     && t.MerchantName === lastedTransaction.merchantName);
-                if (lastTransactions)
+                if (lastTransactions != -1)
                     transactionsBankCards.splice(lastTransactions);
             }
+            i++;
         }
         this.createTransaction(transactionsBankCards.reverse());
     }
@@ -150,9 +154,10 @@ export class Transactions {
                 )
             }
         });
-        
+        console.log(transaction.length);
+
         if (merchants?.length) {
-            await this.prisma.merchant.createMany({
+            const a = await this.prisma.merchant.createMany({
                 data: merchants,
                 skipDuplicates: true
             })
@@ -161,37 +166,42 @@ export class Transactions {
                 });
         }
 
-        // const transactionModel: TransactionPost[] = await transaction.map(t => {
-        //     return {
-        //         userId: Number(this.user.id),
-        //         amount: t?.PurchaseAmount?.toString() || "0",
-        //         date: t?.PurchaseDate || "",
-        //         description: t?.PurchaseTypeDescription || "",
-        //         merchantName: t?.MerchantName.length ? t.MerchantName : "אין סוחר"
-        //     }
-        // });
-        // console.log(transactionModel);
+        const transactionModel: TransactionPost[] = await transaction.map(t => {
+            let amount: number;
+            if (t?.DebitCurrencyCode === "ILS")
+                amount = t?.DebitAmount
+            else
+                amount = t?.PurchaseAmount
 
-        // if (transactionModel.length) {
-        //     const a = await this.prisma.transactionCard.createMany({
-        //         data: transactionModel
-        //     })
-        //         .catch(err => {
-        //             console.log(err);
-        //             success = false;
-        //         });
-        //     console.log(a);
-        // }
+            return {
+                userId: Number(this.user.id),
+                amount: amount.toString() || "0",
+                date: t?.PurchaseDate || "",
+                description: t?.PurchaseTypeDescription || "",
+                firstTransactionOfMonth: t?.FirstTransactionOfMonth ? t?.FirstTransactionOfMonth : "",
+                merchantName: t?.MerchantName.length ? t.MerchantName : "אין סוחר"
+            }
+        });
+
+        if (transactionModel.length) {
+            const a = await this.prisma.transaction.createMany({
+                data: transactionModel
+            })
+                .catch(err => {
+                    console.log(err);
+                    success = false;
+                });
+        }
 
 
         return success;
     }
 
     private async getLastedTransaction(): Promise<{ date: string, merchantName: string, amount: string } | null> {
-        const lastedTransaction = await this.prisma.transactionCard.findMany({
+        const lastedTransaction = await this.prisma.transaction.findMany({
             where: { userId: this.user.id },
             select: { date: true, merchantName: true, amount: true },
-            orderBy: { date: 'asc' },
+            orderBy: { date: 'desc' },
             take: 1
         })
             .catch(err => {

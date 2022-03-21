@@ -4,4 +4,5 @@ export interface TransactionPost {
     date: string
     description: string
     merchantName: string
+    firstTransactionOfMonth: string
 }

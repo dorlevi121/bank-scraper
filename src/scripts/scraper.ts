@@ -26,7 +26,7 @@ export class Scraper {
 
     this.account = new ConnectAccount(this.user);
     const connect = await this.account.connectToAccount(this.browser.page);
-
+    
     if (connect) {
       const tb = new Transactions(this.browser.page, this.user);
       // await tb.getTransactionsBank();
