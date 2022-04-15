@@ -11,17 +11,18 @@ datasource db {
 }
 
 model User {
-  id              Int           @id @default(autoincrement())
-  dateCreated     DateTime      @default(now())
-  dateUpdated     DateTime      @updatedAt
-  email           String        @unique
-  phone           String        @unique
-  firstName       String
-  lastName        String
-  hashedPassword  String
-  status          UserStatus    @default(PENDING)
-  transactionCard Transaction[]
-  bank            Bank?
+  id                     Int           @id @default(autoincrement())
+  dateCreated            DateTime      @default(now())
+  dateUpdated            DateTime      @updatedAt
+  lastTransactionRequest String        @default("")
+  email                  String        @unique
+  phone                  String        @unique
+  firstName              String
+  lastName               String
+  hashedPassword         String
+  status                 UserStatus    @default(PENDING)
+  transaction            Transaction[]
+  bank                   Bank?
 }
 
 model Bank {
@@ -37,32 +38,32 @@ model Bank {
 }
 
 model Transaction {
-  id                      Int      @id @default(autoincrement())
-  dateCreated             DateTime @default(now())
-  dateUpdated             DateTime @updatedAt
-  userId                  Int
-  user                    User     @relation(fields: [userId], references: [id])
-  date                    String
-  description             String?
-  amount                  String
-  firstTransactionOfMonth String
-  merchantName            String
-  merchant                Merchant @relation(fields: [merchantName], references: [name])
+  id               Int      @id @default(autoincrement())
+  dateCreated      DateTime @default(now())
+  dateUpdated      DateTime @updatedAt
+  userId           Int
+  user             User     @relation(fields: [userId], references: [id])
+  date             String
+  description      String?
+  amount           String
+  transactionMonth String
+  merchantName     String
+  merchant         Merchant @relation(fields: [merchantName], references: [name])
 }
 
 model Merchant {
-  id              Int               @id @default(autoincrement())
-  dateCreated     DateTime          @default(now())
-  dateUpdated     DateTime          @updatedAt
-  name            String            @unique
-  phone           String?
-  address         String?
-  city            String?
-  sectorName      String?
-  sector          MerchantSector?   @relation(fields: [sectorName], references: [name])
-  categoryId      Int?
-  category        MerchantCategory? @relation(fields: [categoryId], references: [id])
-  TransactionCard Transaction[]
+  id          Int               @id @default(autoincrement())
+  dateCreated DateTime          @default(now())
+  dateUpdated DateTime          @updatedAt
+  name        String            @unique
+  phone       String?
+  address     String?
+  city        String?
+  sectorName  String?
+  sector      MerchantSector?   @relation(fields: [sectorName], references: [name])
+  categoryId  Int?
+  category    MerchantCategory? @relation(fields: [categoryId], references: [id])
+  Transaction Transaction[]
 }
 
 model MerchantSector {

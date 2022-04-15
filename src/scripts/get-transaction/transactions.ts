@@ -7,6 +7,7 @@ import { getData } from "../../utils/get-data.utils";
 import { MerchantSectorPost } from "../../view-models/merchant-sector.vm";
 import { MerchantPost } from "../../view-models/merchant.vm";
 import { TransactionPost } from "../../view-models/transaction.vm";
+import { UserGet } from "../../view-models/user.vm";
 
 export class Transactions {
 
@@ -14,12 +15,14 @@ export class Transactions {
     private BASE_URL = 'https://start.telebank.co.il/';
     private accountNumber = "";
     private page: Page
-    private user: any;
+    private user: UserGet;
+    private lastTransactionRequest: string;
 
     constructor(page: Page, user: any) {
         this.page = page;
         this.user = user;
         this.accountNumber = this.user.bank.accountNumber;
+        this.lastTransactionRequest = this.user.lastTransactionRequest;
     }
 
     // from date example - 10/05/2021 - DD/MM/yyyy
@@ -59,60 +62,76 @@ export class Transactions {
     // from date example - 20210510 - YYYYMMDD
     public async getTransactionsBankCard() {
         let transactionsBankCards: CardDebitsTransactionEntry[] = [];
+        let lastedTransaction: { date: string; merchantName: string; amount: string; } | null = null;
         let fromDate: string = '';
         let monthDifference: number = 0;
         const urlsRequest: { url: string, date: string }[] = [];
+        const currentMonthUrl = this.BASE_URL + "Titan/gatewayAPI/creditCards/cardCurrentDebitTransactions/" +
+            this.accountNumber + "/A";
 
         await this.page.waitForSelector("#balance-block-first-line-0");
 
-        const lastedTransaction = await this.getLastedTransaction();
+        const currentMonthRequest: TransactionBankCardJson = await getData(this.page, currentMonthUrl);
+        const currentMonthTransaction: CardDebitsTransactionEntry[] = currentMonthRequest.CardCurrentDebitTransactions.CardDebitsTransactionsBlock.CardDebitsTransactionEntry;
 
-        if (lastedTransaction) {
+        if (this.user.lastTransactionRequest) {
+            lastedTransaction = await this.getLastedTransaction(moment(this.user.lastTransactionRequest, "DDMMYYY").format("MMYY"));
+        }
+        // It's mean that the last trnsaction its from the cuurent month if true
+        const isSameMonth: number = currentMonthTransaction.findIndex(t =>
+            t.PurchaseDate === lastedTransaction?.date && t.PurchaseAmount === Number(lastedTransaction?.amount)
+            && t.MerchantName === lastedTransaction?.merchantName);
+
+        if (lastedTransaction && isSameMonth === -1) {
             const fromDay = Number(moment(lastedTransaction.date, "YYYYMMDD").get('D'));
             fromDate = moment(lastedTransaction.date, "YYYYMMDD").format("MMYYYY");
             // Month difference between todat to last transaction month
-            monthDifference = moment(moment().format("MMYYYY"), "MMYYYY").diff(moment(fromDate, "MMYYYY").
-                add(fromDay > 6 ? 1 : 0, 'month'), 'months', true);
+            monthDifference = moment(moment().format("MMYYYY"), "MMYYYY").diff(moment(fromDate, "MMYYYY"), 'months', true);
             monthDifference = monthDifference > 12 ? 12 : monthDifference;
-        }
 
-        if (fromDate.length && monthDifference > 0) {
-            for (let i = monthDifference; i > 0; i--) {
-                const startDateStr = moment().subtract(i, 'months').format('MMYYYY');
-                const url = this.BASE_URL + "Titan/gatewayAPI/creditCards/cardPastDebitTransactions/" +
-                    this.accountNumber + '/' + startDateStr + "/A";
-                urlsRequest.push({ url, date: moment(startDateStr).format('MMYY') });
+            if (monthDifference > 0) {
+                for (let i = monthDifference; i > 0; i--) {
+                    const startDateStr = moment().subtract(i, 'months').format('MMYYYY');
+                    const url = this.BASE_URL + "Titan/gatewayAPI/creditCards/cardPastDebitTransactions/" +
+                        this.accountNumber + '/' + startDateStr + "/A";
+                    urlsRequest.push({ url, date: moment(startDateStr).format('MMYY') });
+                }
             }
         }
 
-        const url = this.BASE_URL + "Titan/gatewayAPI/creditCards/cardCurrentDebitTransactions/" +
-            this.accountNumber + "/A";
-        urlsRequest.push({ url, date: moment().format('MMYY') });
+        urlsRequest.push({ url: currentMonthUrl, date: moment(currentMonthTransaction.at(-1)?.PurchaseDate).format('MMYY') });
 
         let i = 0;
-        for (const url of urlsRequest) { 
-            const data: TransactionBankCardJson = await getData(this.page, url.url);
-            if (data.CardCurrentDebitTransactions) {
-                const monthTransaction = data.CardCurrentDebitTransactions.CardDebitsTransactionsBlock.CardDebitsTransactionEntry;
-                monthTransaction[monthTransaction.length - 1].FirstTransactionOfMonth = url.date;
-                transactionsBankCards = transactionsBankCards.concat(monthTransaction)
+        for (const url of urlsRequest) {
+            const lastedMonthTransactions = await this.prisma.transaction.findMany({
+                where: { userId: this.user.id, transactionMonth: url.date },
+                select: { date: true, merchantName: true, amount: true },
+            })
+            if (i === urlsRequest.length - 1) {
+                const withMonthTransaction = currentMonthTransaction.map(t =>
+                    ({ ...t, TransactionMonth: url.date }));;
+                const newTransactions = this.getNotExistTransaction(withMonthTransaction, lastedMonthTransactions);
+                transactionsBankCards = transactionsBankCards.concat(newTransactions);
             }
-            else if (data.CardPastDebitTransactions) {
-                const monthTransaction = data.CardPastDebitTransactions.CardDebitsTransactionsBlock.CardDebitsTransactionEntry;
-                monthTransaction[monthTransaction.length - 1].FirstTransactionOfMonth = url.date;
-                transactionsBankCards = transactionsBankCards.concat(monthTransaction)
+            else {
+                const data: TransactionBankCardJson = await getData(this.page, url.url);
+                const withMonthTransaction = data.CardCurrentDebitTransactions.CardDebitsTransactionsBlock.CardDebitsTransactionEntry.map(t =>
+                    ({ ...t, TransactionMonth: url.date }));;
+                const newTransactions = this.getNotExistTransaction(withMonthTransaction, lastedMonthTransactions);
 
-            }
-            if (i === urlsRequest.length - 1 && lastedTransaction) {
-                const lastTransactions: number = transactionsBankCards.findIndex(t =>
-                    t.PurchaseDate === lastedTransaction?.date && t.PurchaseAmount === Number(lastedTransaction.amount)
-                    && t.MerchantName === lastedTransaction.merchantName);
-                if (lastTransactions != -1)
-                    transactionsBankCards.splice(lastTransactions);
+                transactionsBankCards = transactionsBankCards.concat(newTransactions)
             }
             i++;
         }
+        // transactionsBankCards = transactionsBankCards.slice(2);
+
+
         this.createTransaction(transactionsBankCards.reverse());
+
+        await this.prisma.user.update({
+            where: { id: this.user.id },
+            data: { lastTransactionRequest: moment().format('DDMMYYYY') }
+        });
     }
 
 
@@ -154,7 +173,6 @@ export class Transactions {
                 )
             }
         });
-        console.log(transaction.length);
 
         if (merchants?.length) {
             const a = await this.prisma.merchant.createMany({
@@ -166,6 +184,7 @@ export class Transactions {
                 });
         }
 
+        // Transaction
         const transactionModel: TransactionPost[] = await transaction.map(t => {
             let amount: number;
             if (t?.DebitCurrencyCode === "ILS")
@@ -178,7 +197,7 @@ export class Transactions {
                 amount: amount.toString() || "0",
                 date: t?.PurchaseDate || "",
                 description: t?.PurchaseTypeDescription || "",
-                firstTransactionOfMonth: t?.FirstTransactionOfMonth ? t?.FirstTransactionOfMonth : "",
+                transactionMonth: t?.TransactionMonth ? t?.TransactionMonth : "",
                 merchantName: t?.MerchantName.length ? t.MerchantName : "אין סוחר"
             }
         });
@@ -197,9 +216,9 @@ export class Transactions {
         return success;
     }
 
-    private async getLastedTransaction(): Promise<{ date: string, merchantName: string, amount: string } | null> {
+    private async getLastedTransaction(transactionMonth: string): Promise<{ date: string, merchantName: string, amount: string } | null> {
         const lastedTransaction = await this.prisma.transaction.findMany({
-            where: { userId: this.user.id },
+            where: { userId: this.user.id, transactionMonth },
             select: { date: true, merchantName: true, amount: true },
             orderBy: { date: 'desc' },
             take: 1
@@ -212,5 +231,21 @@ export class Transactions {
             return lastedTransaction[0];
 
         return null;
+    }
+
+    private getNotExistTransaction(bankTransaction: CardDebitsTransactionEntry[], dbTransaction: { date: string; merchantName: string; amount: string; }[]): CardDebitsTransactionEntry[] {
+        const transactions = [];
+        for (let i = 0; i < bankTransaction.length; i++) {
+            const isExist = dbTransaction.find(tran =>
+                bankTransaction[i].PurchaseDate.toString() === tran.date.toString() &&
+                tran.amount.toString() === (bankTransaction[i]?.DebitCurrencyCode === "ILS" ? bankTransaction[i].DebitAmount.toString() : bankTransaction[i].PurchaseAmount.toString()));
+
+            if (!isExist) {
+                transactions.push(bankTransaction[i])
+            }
+        }
+        console.log(transactions.length);
+
+        return transactions;
     }
 }

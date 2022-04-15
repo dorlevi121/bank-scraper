@@ -87,7 +87,7 @@ export interface TransactionBankCardJson {
     BankIssueFlag: string
     IsIssuedByCal: string
     CardValidityDate: string
-    FirstTransactionOfMonth: string //MMYY
+    TransactionMonth: string //MMYY
   }
   
   export interface DiscountKeyTotalsBlock {
